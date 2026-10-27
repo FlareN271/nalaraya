@@ -71,7 +71,7 @@ main{padding-block:22px 64px;display:flex;flex-direction:column;gap:18px}
 .btn.sm{padding:4px 10px;font-size:.86rem}
 .btn:disabled{opacity:.55;cursor:default}
 label.f{display:flex;flex-direction:column;gap:5px;font-size:.86rem;color:var(--ink-2);min-width:0}
-input[type=text],input[type=email],input[type=number],select,textarea{background:#fff;border:2px solid var(--line-2);border-radius:4px;padding:7px 10px;color:var(--ink);width:100%;min-width:0}
+input[type=text],input[type=email],input[type=password],input[type=number],select,textarea{background:#fff;border:2px solid var(--line-2);border-radius:4px;padding:7px 10px;color:var(--ink);width:100%;min-width:0}
 textarea{resize:vertical;min-height:72px}
 input::placeholder,textarea::placeholder{color:#b4a28a}
 input[type=checkbox]{accent-color:var(--teal);width:18px;height:18px}
@@ -413,10 +413,10 @@ function normalize(st){
    On GitHub Pages, fill in your Supabase project to sync across devices.
    ========================================================= */
 var CONFIG={
-  supabaseUrl:'https://flaren271.github.io/nalaraya/',      
-  supabaseAnonKey:'sb_publishable_5byfI0RsXkr4J07Vh23y9Q_xZmjmti2'  
+  supabaseUrl:'',      /* e.g. 'https://abcd1234.supabase.co' (Project Settings > API) */
+  supabaseAnonKey:''   /* the publishable key (sb_publishable_...) or legacy anon key; safe to publish because Row Level Security protects the data */
 };
-var SUPA_LIB='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+var SUPA_LIB='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js';
 var SB={client:null,user:null};
 function sbx(r){if(r&&r.error)throw r.error;return r?r.data:null;}
 
@@ -433,9 +433,14 @@ var Store={
       if(db&&user){try{var id=await user.id();if(id){this.ref=db.doc('data/users/'+id+'/nalaraya');this.mode='db';return;}}catch(e){}}
     }
     if(CONFIG.supabaseUrl&&CONFIG.supabaseAnonKey){
+      var url=String(CONFIG.supabaseUrl).trim().replace(/\/+(rest|auth)\/v1.*$/,'').replace(/\/+$/,'');
+      if(!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)$/i.test(url)){
+        SB.cfgErr='Isi supabaseUrl sekarang "'+CONFIG.supabaseUrl+'". Seharusnya berbentuk https://kodeproject.supabase.co, yaitu Project URL dari tombol Connect atau Settings > API Keys di dashboard Supabase. Alamat dashboard (supabase.com/dashboard/...) atau alamat GitHub Pages tidak bisa dipakai.';
+        LKEY='nalaraya.tamu';this.mode=localOK()?'tamu':'memori';return;
+      }
       try{
         if(!window.supabase)await loadScript(SUPA_LIB);
-        SB.client=window.supabase.createClient(CONFIG.supabaseUrl,CONFIG.supabaseAnonKey);
+        SB.client=window.supabase.createClient(url,String(CONFIG.supabaseAnonKey).trim());
         var s=await SB.client.auth.getSession();
         SB.user=s.data&&s.data.session?s.data.session.user:null;
         SB.client.auth.onAuthStateChange(function(ev){if((ev==='SIGNED_IN'&&!SB.user)||(ev==='SIGNED_OUT'&&SB.user))location.reload();});
@@ -757,7 +762,7 @@ function renderTop(){
   $('#nav').innerHTML=VIEWS.map(function(v){return '<button type="button" data-go="'+v[0]+'"'+((S.view===v[0]||(S.view==='langit'&&v[0]==='pustaka'))?' aria-current="page"':'')+'>'+v[1]+(v[0]==='baca'&&n?'<span class="n num">'+n+'</span>':'')+'</button>';}).join('');
   var wk=weekInfo(),g=gelar();
   $('#week-chip').textContent='Lilin '+wk.count+'/'+wk.target+' · '+g.nama;
-  $('#auth-slot').innerHTML=(Store.mode==='tamu'&&SB.client)?'<button type="button" class="btn sm sun" data-go="masuk">Masuk</button>':'';
+  $('#auth-slot').innerHTML=(Store.mode==='tamu'&&(SB.client||SB.cfgErr))?'<button type="button" class="btn sm sun" data-go="masuk">Masuk</button>':'';
 }
 
 /* =========================================================
@@ -1051,7 +1056,7 @@ function viewCatatan(){
   if(!ses.length) h+='<p class="empty">Belum ada sesi. Sesi pertamamu akan muncul di sini beserta catatannya.</p>';
   else h+='<div class="tbl-wrap"><table><thead><tr><th>Waktu</th><th>Rak</th><th>Jenis</th><th>Menit</th><th>Catatan</th><th></th></tr></thead><tbody>'+ses.slice(0,60).map(function(s){return '<tr><td class="num small">'+fmtTgl(s.ts)+' '+fmtJam(s.ts)+'</td><td>'+esc(rakNama(s.rak))+'</td><td class="small muted">'+esc(s.jenis==='review'?'Review kartu'+(s.kartu?' ('+s.kartu+')':''):s.jenis==='luar'?(s.sumber||'Luar'):'Sesi fokus')+'</td><td class="num">'+(s.menit||0)+'</td><td class="clip">'+esc(s.catatan||'')+'</td><td><button class="btn sm ghost danger" data-act="ses-del" data-v="'+s.id+'">Hapus</button></td></tr>';}).join('')+'</tbody></table></div>';
   h+='</div>';
-  h+='<div class="grid g2" style="align-items:start"><div class="panel"><h3>Pengaturan</h3>'+(Store.mode==='supa'?'<div class="spread"><span class="small muted">Masuk sebagai '+esc(SB.user.email||'pemilik')+'</span><button class="btn sm ghost" data-act="logout">Keluar</button></div>':'')+'<div class="grid g3">'+
+  h+='<div class="grid g2" style="align-items:start"><div class="panel"><h3>Pengaturan</h3>'+(Store.mode==='supa'?'<div class="spread"><span class="small muted">Masuk sebagai '+esc(SB.user.email||'pemilik')+'</span><button class="btn sm ghost" data-act="logout">Keluar</button></div><details><summary class="small muted" style="cursor:pointer">Ganti kata sandi</summary><div class="grid g2" style="margin-top:8px"><label class="f" for="new-pass">Kata sandi baru<input type="password" id="new-pass" autocomplete="new-password"></label><label class="f" for="new-pass2">Ulangi<input type="password" id="new-pass2" autocomplete="new-password"></label></div><div class="row" style="margin-top:8px"><button class="btn sm" data-act="change-pass">Simpan kata sandi</button><span id="pass-msg" class="small muted" role="status"></span></div></details>':'')+'<div class="grid g3">'+
     '<label class="f" for="set-nama">Nama<input type="text" id="set-nama" maxlength="40" value="'+esc(p.settings.nama)+'"></label>'+
     '<label class="f" for="set-target">Target hari/minggu<input type="number" id="set-target" min="1" max="7" step="1" value="'+p.settings.targetMingguan+'"></label>'+
     '<label class="f" for="set-baru">Kartu baru/hari<input type="number" id="set-baru" min="0" max="100" step="1" value="'+p.settings.kartuBaru+'"></label></div>'+
@@ -1088,17 +1093,50 @@ function viewPanduan(){
 }
 
 function viewMasuk(){
-  var h='<div class="head"><div><div class="eyebrow">Gerbang pemilik</div><h1>Masuk ke Nalaraya-mu</h1><p class="sub">Pemilik masuk dengan tautan yang dikirim ke email, lalu datanya tersinkron di semua perangkat. Pengunjung lain cukup melihat-lihat sebagai tamu.</p></div></div>';
+  var h='<div class="head"><div><div class="eyebrow">Gerbang pemilik</div><h1>Masuk ke Nalaraya-mu</h1><p class="sub">Pemilik masuk dengan email dan kata sandi yang didaftarkan di Supabase, lalu datanya tersinkron di semua perangkat. Pengunjung lain cukup melihat-lihat sebagai tamu.</p></div></div>';
   if(Store.mode==='supa') return h+'<div class="panel"><p>Kamu sudah masuk sebagai '+esc(SB.user.email||'pemilik')+'.</p><div class="row"><button class="btn primary" data-go="aula">Ke Aula</button><button class="btn ghost" data-act="logout">Keluar</button></div></div>';
+  if(SB.cfgErr) return h+'<div class="panel note"><h3>Alamat Supabase belum benar</h3><p class="small">'+esc(SB.cfgErr)+'</p></div>';
   if(!SB.client) return h+'<div class="panel note"><p>Login belum disiapkan di versi ini. Isi CONFIG Supabase di index.html (lihat README).</p></div>';
-  return h+'<div class="panel" style="max-width:560px"><label class="f" for="login-email">Email pemilik<input type="email" id="login-email" autocomplete="email" placeholder="nama@email.com"></label><div class="row"><button class="btn primary" data-act="login-send">Kirim tautan masuk</button></div><p id="login-msg" class="small muted" role="status"></p></div>';
+  return h+'<div class="panel" style="max-width:560px">'+
+    '<label class="f" for="login-email">Email<input type="email" id="login-email" autocomplete="username" placeholder="nama@email.com"></label>'+
+    '<label class="f" for="login-pass">Kata sandi<input type="password" id="login-pass" autocomplete="current-password"></label>'+
+    '<div class="row"><button class="btn primary" data-act="login-pass">Masuk</button></div>'+
+    '<p id="login-msg" class="small muted" role="status"></p>'+
+    '<details><summary class="small muted" style="cursor:pointer">Lupa kata sandi, atau ingin masuk lewat tautan email?</summary><div style="display:flex;flex-direction:column;gap:8px;margin-top:8px"><p class="small muted">Tautan hanya bisa dipakai jika emailnya benar-benar bisa menerima surat. Isi email di atas, lalu:</p><div class="row"><button class="btn sm" data-act="login-send">Kirim tautan masuk</button></div></div></details>'+
+    '</div>';
+}
+function loginErr(e){
+  var m=String((e&&e.message)||e||'');
+  if(/Unexpected token|not valid JSON|Failed to fetch|NetworkError|Load failed/i.test(m)) return 'Supabase tidak bisa dihubungi. Periksa supabaseUrl di CONFIG: harus berbentuk https://kodeproject.supabase.co (dari Settings > API Keys / Connect), bukan alamat dashboard. Pastikan juga project tidak sedang di-pause.';
+  if(/Invalid login credentials/i.test(m)) return 'Email atau kata sandi salah.';
+  if(/Email not confirmed/i.test(m)) return 'Akun ini belum dikonfirmasi. Di Supabase buka Authentication > Users, lalu konfirmasi pengguna ini.';
+  if(/Invalid API key|apikey/i.test(m)) return 'Kunci di CONFIG tidak cocok. Salin ulang publishable key dari Settings > API Keys.';
+  if(/rate limit/i.test(m)) return 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.';
+  if(/Signups not allowed|not found|User not found/i.test(m)) return 'Email ini belum terdaftar di Authentication > Users.';
+  return m||'Gagal masuk. Coba lagi.';
+}
+async function loginPass(){
+  var ei=$('#login-email'),pi=$('#login-pass'),msg=$('#login-msg'),em=ei?ei.value.trim():'',pw=pi?pi.value:'';
+  if(!/^\S+@\S+\.\S+$/.test(em)){msg.textContent='Masukkan alamat email yang valid.';ei.focus();return;}
+  if(!pw){msg.textContent='Masukkan kata sandi.';pi.focus();return;}
+  msg.textContent='Membuka gerbang…';
+  try{var r=await SB.client.auth.signInWithPassword({email:em,password:pw});if(r.error)throw r.error;msg.textContent='Berhasil masuk. Memuat datamu…';setTimeout(function(){location.reload();},400);}
+  catch(e){msg.textContent=loginErr(e);}
 }
 async function loginSend(){
   var inp=$('#login-email'),msg=$('#login-msg'),em=inp?inp.value.trim():'';
   if(!/^\S+@\S+\.\S+$/.test(em)){msg.textContent='Masukkan alamat email yang valid.';inp.focus();return;}
   msg.textContent='Mengirim tautan…';
-  var r=await SB.client.auth.signInWithOtp({email:em,options:{shouldCreateUser:false,emailRedirectTo:location.origin+location.pathname}});
-  msg.textContent=r.error?'Tautan tidak terkirim: '+r.error.message+'. Pastikan email ini sudah terdaftar sebagai pengguna di Supabase.':'Tautan masuk sudah dikirim ke '+em+'. Buka emailnya di perangkat ini lalu klik tautannya.';
+  try{var r=await SB.client.auth.signInWithOtp({email:em,options:{shouldCreateUser:false,emailRedirectTo:location.origin+location.pathname}});if(r.error)throw r.error;msg.textContent='Tautan masuk sudah dikirim ke '+em+'. Buka emailnya di perangkat ini lalu klik tautannya.';}
+  catch(e){msg.textContent='Tautan tidak terkirim. '+loginErr(e);}
+}
+async function changePass(){
+  var a=$('#new-pass'),b=$('#new-pass2'),msg=$('#pass-msg');
+  if(!a.value||a.value.length<8){msg.textContent='Kata sandi minimal 8 karakter.';a.focus();return;}
+  if(a.value!==b.value){msg.textContent='Kedua kata sandi tidak sama.';b.focus();return;}
+  msg.textContent='Menyimpan…';
+  try{var r=await SB.client.auth.updateUser({password:a.value});if(r.error)throw r.error;a.value='';b.value='';msg.textContent='Kata sandi diganti.';}
+  catch(e){msg.textContent=loginErr(e);}
 }
 
 /* =========================================================
@@ -1181,6 +1219,8 @@ function act(a,el){
       p.settings.nama=$('#set-nama').value.trim()||'Naufal';p.settings.targetMingguan=tgt;p.settings.kartuBaru=kb;Store.profile();render();toast('Pengaturan disimpan.');break;
     case 'backup':backup();break;
     case 'login-send':loginSend();break;
+    case 'login-pass':loginPass();break;
+    case 'change-pass':changePass();break;
     case 'logout':if(SB.client){SB.client.auth.signOut();toast('Keluar…');}break;
     case 'restore-yes':doRestore();break;
     case 'restore-no':S.pendingRestore=null;$('#restore-confirm').innerHTML='';break;
@@ -1310,7 +1350,7 @@ function doRestore(){
 /* =========================================================
    Events
    ========================================================= */
-var SAFE_WHILE_LOADING={'rak':1,'topik':1,'tip-next':1,'copy-nlm':1,'login-send':1};
+var SAFE_WHILE_LOADING={'rak':1,'topik':1,'tip-next':1,'copy-nlm':1,'login-send':1,'login-pass':1};
 document.addEventListener('click',function(ev){
   var hs=ev.target.closest('[data-hs]');
   if(hs){var v=hs.dataset.hs;if(v==='lilin'){var wk=weekInfo();toast('Lilin minggu ini: '+wk.count+' dari '+wk.target+' hari.');var g=$('#gerbang');if(g)g.scrollIntoView({block:'nearest'});return;}go(v);return;}
@@ -1336,6 +1376,7 @@ document.addEventListener('keydown',function(ev){
     if(ev.target.id==='catatan-sesi'){ev.preventDefault();act('finish-save');return;}
     var m=ev.target.id.match(/^mi-(.+)-(\d+)$/);if(m){ev.preventDefault();act('misi-add',{dataset:{q:m[1],b:m[2]}});return;}
     if(ev.target.id==='quest-baru'){ev.preventDefault();act('quest-add');return;}
+    if(ev.target.id==='login-pass'||ev.target.id==='login-email'){ev.preventDefault();loginPass();return;}
   }
   if(tag==='input'||tag==='textarea'||tag==='select')return;
   if(S.view!=='baca'||!S.review)return;
